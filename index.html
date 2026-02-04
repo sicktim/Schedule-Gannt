@@ -1,9 +1,12 @@
+<!-- Version 5.2 - Last Updated Timestamp & Production Features -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TPS Class Schedule</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TPS Schedule</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -11,32 +14,57 @@
 
         * {
             font-family: 'JetBrains Mono', monospace;
+            box-sizing: border-box;
         }
 
         body {
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
-            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden; /* Prevent body scroll, handle in gantt-container */
+            margin: 0;
+            padding: 0;
+            touch-action: none;
         }
 
-        .glass-card {
-            background: rgba(255, 255, 255, 0.05);
+        #root {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .glass-header {
+            background: rgba(26, 26, 46, 0.95);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            flex-shrink: 0;
+            z-index: 60;
         }
 
         /* Event type colors */
-        .event-flying { background: rgba(16, 185, 129, 0.8); border-color: #10b981; }
-        .event-ground { background: rgba(245, 158, 11, 0.8); border-color: #f59e0b; }
-        .event-na { background: rgba(239, 68, 68, 0.8); border-color: #ef4444; }
-        .event-supervision { background: rgba(139, 92, 246, 0.8); border-color: #8b5cf6; }
-        .event-other { background: rgba(59, 130, 246, 0.8); border-color: #3b82f6; }
+        .event-flying { background: rgba(16, 185, 129, 0.3); border: 1px solid #10b981; }
+        .event-ground { background: rgba(245, 158, 11, 0.6); border: 1px solid #f59e0b; }
+        .event-na { background: rgba(239, 68, 68, 0.6); border: 1px solid #ef4444; }
+        .event-supervision { background: rgba(139, 92, 246, 0.6); border: 1px solid #8b5cf6; }
+        .event-academics { background: rgba(59, 130, 246, 0.6); border: 1px solid #3b82f6; }
+        .event-other { background: rgba(107, 114, 128, 0.6); border: 1px solid #6b7280; }
+
+        /* Flight specific inner bar */
+        .flight-actual-bar {
+            background: rgba(16, 185, 129, 0.9);
+            height: 60%;
+            top: 20%;
+            position: absolute;
+            border-radius: 1px;
+            z-index: 6; 
+        }
 
         .spinner {
             border: 2px solid rgba(255, 255, 255, 0.1);
             border-top: 2px solid #3b82f6;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             animation: spin 1s linear infinite;
         }
 
@@ -45,115 +73,257 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Gantt grid */
+        /* Gantt Container */
+        .gantt-container {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background: rgba(0, 0, 0, 0.2);
+            cursor: grab;
+            touch-action: none;
+        }
+        
+        .gantt-container:active {
+            cursor: grabbing;
+        }
+        
         .gantt-grid {
             display: grid;
-            grid-template-columns: 140px repeat(5, 1fr);
+            grid-template-columns: 180px repeat(14, 300px); /* Name col + days */
             gap: 1px;
             background: rgba(255, 255, 255, 0.1);
-        }
-
-        .gantt-cell {
-            background: rgba(15, 15, 35, 0.9);
-            min-height: 50px;
-            padding: 4px;
+            min-height: 100%;
             position: relative;
         }
 
+        /* Sticky Headers */
         .gantt-header {
-            background: rgba(30, 30, 60, 0.9);
-            font-weight: 600;
+            background: rgba(30, 30, 60, 1);
+            padding: 6px 8px 0px 8px;
             text-align: center;
-            padding: 12px 8px;
+            font-size: 0.75rem;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 54px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            user-select: none;
+            cursor: pointer;
         }
 
-        .gantt-name {
-            background: rgba(30, 30, 60, 0.9);
-            font-weight: 500;
+        .header-time-scale {
+            position: relative;
+            width: 100%;
+            height: 14px;
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: auto;
+            pointer-events: none;
+        }
+
+        /* Corner Piece */
+        .gantt-name-header {
+            position: sticky;
+            left: 0;
+            top: 0;
+            z-index: 50;
+            background: rgba(30, 30, 60, 1);
             display: flex;
             align-items: center;
-            padding: 8px;
-            font-size: 0.75rem;
+            justify-content: center;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            color: white;
+            font-weight: bold;
+            cursor: default;
         }
 
-        .event-block {
-            border-radius: 3px;
-            padding: 2px 4px;
-            margin: 1px 0;
+        /* Row Names */
+        .gantt-row-name {
+            position: sticky;
+            left: 0;
+            background: rgba(20, 20, 40, 1);
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            z-index: 30;
+            border-right: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+            user-select: none;
+        }
+
+        /* Cells */
+        .gantt-cell-container {
+            background: rgba(15, 15, 35, 0.6);
+            position: relative;
+            padding: 0;
+            border-right: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .event-bar {
+            position: absolute;
+            height: 20px;
+            border-radius: 2px;
             font-size: 0.65rem;
-            line-height: 1.2;
-            border-left: 2px solid;
+            padding: 0 4px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            transition: transform 0.1s;
+            line-height: 1;
+            cursor: pointer;
         }
 
-        .event-block:hover {
-            white-space: normal;
+        .event-bar-text {
             z-index: 10;
             position: relative;
+            text-shadow: 0 0 2px rgba(0,0,0,0.8);
         }
 
-        /* Multi-select dropdown */
-        .multi-select {
-            position: relative;
-            z-index: 100;
+        .event-bar:hover {
+            z-index: 50;
+            filter: brightness(1.2);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         }
 
-        .multi-select-trigger {
-            min-width: 200px;
-            text-align: left;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .multi-select-dropdown {
+        .personnel-note {
             position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: #1f2937;
-            border: 1px solid #374151;
-            border-radius: 0.5rem;
-            margin-top: 4px;
-            z-index: 100;
-            max-height: 300px;
-            overflow-y: auto;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            bottom: 2px;
+            left: 4px;
+            right: 4px;
+            font-size: 0.6rem;
+            color: #facc15;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            pointer-events: none;
+            line-height: 1;
         }
 
-        .multi-select-option {
+        /* Timeline Overlay Styles */
+        .timeline-grid-line {
+            position: absolute;
+            top: 54px;
+            bottom: 0;
+            width: 2px;
+            background-color: #ef4444;
+            box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
+            pointer-events: none;
+            z-index: 55;
+            will-change: transform, left;
+        }
+
+        .timeline-grid-range {
+            position: absolute;
+            top: 54px;
+            bottom: 0;
+            background-color: rgba(59, 130, 246, 0.15);
+            border-left: 1px solid rgba(59, 130, 246, 0.5);
+            border-right: 1px solid rgba(59, 130, 246, 0.5);
+            pointer-events: none;
+            z-index: 55;
+            will-change: transform, left;
+        }
+
+        .timeline-handle-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .timeline-marker-handle {
+            position: absolute;
+            top: auto;
+            bottom: 0;
+            height: 14px;
+            background-color: #ef4444;
+            color: white;
+            font-size: 0.6rem;
+            font-weight: bold;
             display: flex;
             align-items: center;
-            padding: 8px 12px;
-            cursor: pointer;
-            transition: background 0.15s;
+            justify-content: center;
+            padding: 0 4px;
+            border-radius: 2px 2px 0 0;
+            transform: translateX(-50%);
+            z-index: 60;
+            cursor: ew-resize;
+            pointer-events: auto;
+            touch-action: none;
         }
 
-        .multi-select-option:hover {
-            background: rgba(255, 255, 255, 0.1);
+        .timeline-marker-handle::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid #ef4444;
         }
 
-        .multi-select-option input {
-            margin-right: 8px;
+        .timeline-range-handle {
+            position: absolute;
+            top: 0;
+            height: 54px;
+            width: 16px;
+            cursor: ew-resize;
+            z-index: 60;
+            pointer-events: auto;
+            display: flex;
+            justify-content: center;
+            touch-action: none;
+        }
+
+        .timeline-range-handle-visual {
+            width: 4px;
+            height: 100%;
+            background-color: #3b82f6;
+            border-radius: 2px;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: #1a1a2e;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
 
         /* Custom scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
-
-        /* Print styles */
-        @media print {
-            body { background: white; }
-            .glass-card { background: white; border: 1px solid #ccc; }
-            .gantt-cell, .gantt-header, .gantt-name { background: white; border: 1px solid #ddd; }
-            .no-print { display: none; }
-        }
+        ::-webkit-scrollbar-corner { background: #1a1a2e; }
     </style>
 </head>
-<body class="text-gray-100 p-4">
+<body>
     <div id="root"></div>
 
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -161,397 +331,581 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback, useRef } = React;
+        const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyS4XcUEFL8P2wDTUywJc4s_kAAIfss0JHmShgdNVYWguDItWZsc9HWaQfiv4nZPt0N/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyZNyrLxkW2vjbq8xpii43rWzYkkDvJTQ_KQCGMyErPZKqssL0XiA_UknwxOJ_XGzAt/exec';
 
-        // Day abbreviations
-        const DAY_ABBREV = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+        // --- UTILITIES ---
 
-        // Multi-select dropdown component
-        function MultiSelect({ options, selected, onChange, placeholder }) {
-            const [isOpen, setIsOpen] = useState(false);
-            const dropdownRef = useRef(null);
+        const timeToMinutes = (timeStr) => {
+            if (!timeStr) return null;
+            const match = timeStr.match(/(\d{1,2}):(\d{2})/);
+            if (!match) return null;
+            return parseInt(match[1]) * 60 + parseInt(match[2]);
+        };
 
-            // Close dropdown when clicking outside
-            useEffect(() => {
-                const handleClickOutside = (event) => {
-                    if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                        setIsOpen(false);
+        const minutesToTime = (mins) => {
+            const h = Math.floor(mins / 60);
+            const m = Math.floor(mins % 60);
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        };
+
+        const getPosition = (startStr, endStr) => {
+            const startMin = timeToMinutes(startStr);
+            const endMin = timeToMinutes(endStr) || (startMin + 60); 
+
+            const rangeStart = 6 * 60; // 06:00
+            const rangeEnd = 18 * 60;  // 18:00
+            const totalMin = rangeEnd - rangeStart;
+
+            const s = Math.max(rangeStart, Math.min(rangeEnd, startMin));
+            const e = Math.max(rangeStart, Math.min(rangeEnd, endMin));
+
+            const left = ((s - rangeStart) / totalMin) * 100;
+            const width = ((e - s) / totalMin) * 100;
+
+            return { left: `${left}%`, width: `${Math.max(width, 2)}%` }; 
+        };
+
+        const getLeftPercent = (minutes) => {
+            const rangeStart = 6 * 60;
+            const rangeEnd = 18 * 60;
+            const totalMin = rangeEnd - rangeStart;
+            return Math.max(0, Math.min(100, ((minutes - rangeStart) / totalMin) * 100));
+        };
+
+        const getMinutesFromClick = (e, rect) => {
+            const rangeStart = 6 * 60;
+            const rangeEnd = 18 * 60;
+            const totalMin = rangeEnd - rangeStart;
+            const x = e.clientX - rect.left;
+            const percent = Math.max(0, Math.min(1, x / rect.width));
+            return Math.round(rangeStart + (percent * totalMin));
+        };
+
+        // --- PARSING LOGIC (API DATA STRUCTURE) ---
+
+        const parseSupervision = (data, date) => {
+            if (!data) return [];
+            const events = [];
+            data.forEach(row => {
+                const duty = row[0];
+                if (!duty || duty === 'Supervision' || !duty.trim()) return;
+                for (let i = 1; i < row.length - 2; i += 3) {
+                    const poc = row[i];
+                    if (poc && poc.trim()) {
+                        events.push({
+                            type: 'Supervision',
+                            title: duty.trim(),
+                            start: row[i+1],
+                            end: row[i+2],
+                            person: poc.trim(),
+                            date: date,
+                            fullTitle: `${duty}: ${poc.trim()}`
+                        });
                     }
-                };
-                document.addEventListener('mousedown', handleClickOutside);
-                return () => document.removeEventListener('mousedown', handleClickOutside);
-            }, []);
-
-            const toggleOption = (option) => {
-                if (selected.includes(option)) {
-                    onChange(selected.filter(s => s !== option));
-                } else {
-                    onChange([...selected, option]);
                 }
-            };
+            });
+            return events;
+        };
 
-            const selectAll = () => {
-                onChange([...options]);
-            };
-
-            const clearAll = () => {
-                onChange([]);
-            };
-
-            const displayText = selected.length === 0
-                ? placeholder
-                : selected.length === options.length
-                    ? 'All Selected'
-                    : `${selected.length} selected`;
-
-            return (
-                <div className="multi-select" ref={dropdownRef}>
-                    <button
-                        type="button"
-                        onClick={() => setIsOpen(!isOpen)}
-                        className="multi-select-trigger bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-                    >
-                        <span>{displayText}</span>
-                        <svg className={`w-4 h-4 ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-
-                    {isOpen && (
-                        <div className="multi-select-dropdown">
-                            <div className="flex gap-2 p-2 border-b border-gray-700">
-                                <button
-                                    onClick={selectAll}
-                                    className="text-xs px-2 py-1 bg-blue-600 rounded hover:bg-blue-700"
-                                >
-                                    Select All
-                                </button>
-                                <button
-                                    onClick={clearAll}
-                                    className="text-xs px-2 py-1 bg-gray-600 rounded hover:bg-gray-700"
-                                >
-                                    Clear
-                                </button>
-                            </div>
-                            {options.map(option => (
-                                <label key={option} className="multi-select-option">
-                                    <input
-                                        type="checkbox"
-                                        checked={selected.includes(option)}
-                                        onChange={() => toggleOption(option)}
-                                        className="rounded"
-                                    />
-                                    <span>{option}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        function App() {
-            const [allData, setAllData] = useState(null);
-            const [categories, setCategories] = useState([]);
-            const [selectedCategories, setSelectedCategories] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [error, setError] = useState(null);
-            const [weekDates, setWeekDates] = useState([]);
-            const [cacheMetadata, setCacheMetadata] = useState(null);
-
-            // Format date as YYYY-MM-DD in local timezone (not UTC)
-            const formatDateLocal = (date) => {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
-
-            // Get current week's dates (Mon-Fri)
-            const getWeekDates = useCallback(() => {
-                const now = new Date();
-                const dayOfWeek = now.getDay();
-                const monday = new Date(now);
-
-                // Adjust to Monday (if Sunday, go back 6 days; otherwise go back to previous Monday)
-                const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                monday.setDate(now.getDate() - daysFromMonday);
-
-                const dates = [];
-                for (let i = 0; i < 5; i++) {
-                    const date = new Date(monday);
-                    date.setDate(monday.getDate() + i);
-                    dates.push({
+        const parseFlying = (data, date) => {
+            if (!data) return [];
+            const events = [];
+            data.forEach(row => {
+                const start = row[1];
+                const eventName = row[5];
+                if (!start || !eventName || eventName === 'Event') return;
+                
+                const crew = row.slice(6, 15).filter(c => c && c.trim());
+                crew.forEach(person => {
+                    events.push({
+                        type: 'Flying',
+                        title: row[0] || 'A/C',
+                        start: start,
+                        end: row[4],
+                        etd: row[2], // Column 2
+                        eta: row[3], // Column 3
+                        person: person.trim(),
                         date: date,
-                        dateStr: formatDateLocal(date),
-                        display: `${DAY_ABBREV[i]} ${date.getMonth() + 1}/${date.getDate()}`
+                        fullTitle: `${row[0] || ''} - ${eventName}`,
+                        details: `Brief: ${start}, ETD: ${row[2]}, ETA: ${row[3]}, Crew: ${crew.join(', ')}`,
+                        notes: row[15]
+                    });
+                });
+            });
+            return events;
+        };
+
+        const parseGround = (data, date) => {
+            if (!data) return [];
+            const events = [];
+            data.forEach(row => {
+                const eventName = row[0];
+                const start = row[1];
+                if (!eventName || !start || eventName === 'Events') return;
+
+                const people = row.slice(3, 10).filter(p => p && p.trim());
+                people.forEach(person => {
+                    events.push({
+                        type: 'Ground',
+                        title: eventName,
+                        start: start,
+                        end: row[2],
+                        person: person.trim(),
+                        date: date,
+                        fullTitle: eventName,
+                        notes: row[10]
+                    });
+                });
+            });
+            return events;
+        };
+
+        const parseNA = (data, date) => {
+            if (!data) return [];
+            const events = [];
+            data.forEach(row => {
+                const reason = row[0];
+                const start = row[1];
+                if (!reason || !start || reason === 'Reason') return;
+
+                const people = row.slice(3).filter(p => p && p.trim());
+                people.forEach(person => {
+                    events.push({
+                        type: 'NA',
+                        title: reason,
+                        start: start,
+                        end: row[2],
+                        person: person.trim(),
+                        date: date,
+                        fullTitle: `NA: ${reason}`
+                    });
+                });
+            });
+            return events;
+        };
+
+        const parseAcademics = (data, roster, date) => {
+            if (!data) return [];
+            const events = [];
+            const groupMap = {
+                'Alpha FTC': 'FTC-A', 'Alpha STC': 'STC-A',
+                'Bravo FTC': 'FTC-B', 'Bravo STC': 'STC-B',
+                'IP': 'Staff IP', 'Staff STC': 'Staff STC',
+                'IFTE/IWSO': 'Staff IFTE/ICSO'
+            };
+
+            data.forEach(row => {
+                const group = row[0];
+                const start = row[1];
+                if (!group || !start || group === 'Academics') return;
+
+                const category = groupMap[group.trim()];
+                if (category && roster[category]) {
+                    roster[category].forEach(person => {
+                        events.push({
+                            type: 'Academics',
+                            title: 'Academics',
+                            start: start,
+                            end: row[2],
+                            person: person, 
+                            date: date,
+                            fullTitle: `${group} Academics`
+                        });
                     });
                 }
-                return dates;
-            }, []);
+            });
+            return events;
+        };
 
-            // Fetch all data in bulk
-            const fetchBulkData = useCallback(async () => {
-                setLoading(true);
-                setError(null);
-
-                try {
-                    const dates = getWeekDates();
-                    setWeekDates(dates);
-
-                    const response = await fetch(`${API_URL}?viewCache=bulk`);
-                    const data = await response.json();
-
-                    if (data.error) {
-                        throw new Error(data.message || 'Failed to fetch data');
+        const parsePersonnelStatus = (data, date) => {
+            if (!data) return [];
+            const statuses = [];
+            data.forEach(block => {
+                if (!block) return;
+                block.forEach(row => {
+                    const name = row[0];
+                    const note = row[3];
+                    if (name && note && name.trim() && note.trim() && note.trim() !== 'Notes') {
+                        statuses.push({
+                            person: name.trim(),
+                            status: note.trim(),
+                            date: date
+                        });
                     }
-
-                    setAllData(data);
-                    setCacheMetadata(data.metadata);
-
-                    // Set categories from data
-                    if (data.categories && data.categories.length > 0) {
-                        setCategories(data.categories);
-                        // Default: select first category if none selected
-                        if (selectedCategories.length === 0) {
-                            setSelectedCategories([data.categories[0]]);
-                        }
-                    }
-                } catch (err) {
-                    console.error('Error fetching bulk data:', err);
-                    setError(err.message);
-                } finally {
-                    setLoading(false);
-                }
-            }, [getWeekDates]);
-
-            // Load data on mount
-            useEffect(() => {
-                fetchBulkData();
-            }, []);
-
-            // Get filtered and sorted people
-            const getFilteredPeople = useCallback(() => {
-                if (!allData || !allData.schedules) return [];
-
-                return allData.schedules
-                    .filter(person => selectedCategories.includes(person.category))
-                    .sort((a, b) => a.name.localeCompare(b.name));
-            }, [allData, selectedCategories]);
-
-            // Get events for a person on a specific date
-            const getEventsForDate = (person, dateStr) => {
-                if (!person.events) return [];
-
-                let events = [];
-
-                if (Array.isArray(person.events)) {
-                    if (person.events.length > 0 && person.events[0].events) {
-                        // Grouped by day: [{date, dayName, events: [...]}]
-                        const dayData = person.events.find(d => d.date === dateStr);
-                        events = dayData ? dayData.events : [];
-                    } else {
-                        // Flat array: [{date, time, ...}]
-                        events = person.events.filter(e => e.date === dateStr);
-                    }
-                }
-
-                // Sort by time
-                events.sort((a, b) => {
-                    const timeA = a.time || a.startTime || '';
-                    const timeB = b.time || b.startTime || '';
-                    return timeA.localeCompare(timeB);
                 });
+            });
+            return statuses;
+        };
 
-                return events;
+        // --- COMPONENTS ---
+
+        const TimelineHeaderHandles = ({ selection, onUpdate }) => {
+            const { type, start, end } = selection;
+            if (type === 'marker') {
+                const percent = getLeftPercent(start);
+                return (
+                    <div className="timeline-handle-container">
+                        <div className="timeline-marker-handle" style={{ left: `${percent}%` }} onPointerDown={(e) => { e.stopPropagation(); onUpdate('drag-marker', e); }}>
+                            {minutesToTime(start)}
+                        </div>
+                    </div>
+                );
+            }
+            if (type === 'range') {
+                const sPercent = getLeftPercent(start);
+                const ePercent = getLeftPercent(end);
+                return (
+                    <div className="timeline-handle-container">
+                        <div className="timeline-range-handle" style={{ left: `calc(${sPercent}% - 8px)` }} onPointerDown={(e) => { e.stopPropagation(); onUpdate('drag-start', e); }}>
+                            <div className="timeline-range-handle-visual" />
+                        </div>
+                        <div className="timeline-range-handle" style={{ left: `calc(${ePercent}% - 8px)` }} onPointerDown={(e) => { e.stopPropagation(); onUpdate('drag-end', e); }}>
+                            <div className="timeline-range-handle-visual" />
+                        </div>
+                    </div>
+                );
+            }
+            return null;
+        };
+
+        const TimelineMarkerLine = ({ selection, dayIndex }) => {
+            if (!selection || selection.dayIndex !== dayIndex) return null;
+            const { type, start, end } = selection;
+            const leftOffset = 181 + (dayIndex * 301);
+            if (type === 'marker') {
+                const percent = getLeftPercent(start);
+                return <div className="timeline-grid-line" style={{ left: `${leftOffset + (percent * 3)}px` }} />;
+            }
+            if (type === 'range') {
+                const sPercent = getLeftPercent(start);
+                const ePercent = getLeftPercent(end);
+                const widthPercent = ePercent - sPercent;
+                const leftPx = leftOffset + (sPercent * 3);
+                const widthPx = widthPercent * 3;
+                return <div className="timeline-grid-range" style={{ left: `${leftPx}px`, width: `${widthPx}px` }} />;
+            }
+            return null;
+        };
+
+        const Modal = ({ event, onClose }) => {
+            if (!event) return null;
+            return (
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-start mb-4">
+                            <h2 className={`text-xl font-bold px-3 py-1 rounded bg-opacity-20 border-l-4 ${event.type === 'Flying' ? 'text-green-400 border-green-500' : event.type === 'Ground' ? 'text-yellow-400 border-yellow-500' : event.type === 'NA' ? 'text-red-400 border-red-500' : 'text-blue-400 border-blue-500'}`}>{event.fullTitle || event.title}</h2>
+                            <button onClick={onClose} className="text-gray-500 hover:text-white text-2xl">&times;</button>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="flex gap-4">
+                                <div className="bg-white/5 p-3 rounded-lg flex-1">
+                                    <div className="text-xs text-gray-500 uppercase font-bold mb-1">Time</div>
+                                    <div className="text-white">{event.start} - {event.end || '??:??'}</div>
+                                </div>
+                                <div className="bg-white/5 p-3 rounded-lg flex-1">
+                                    <div className="text-xs text-gray-500 uppercase font-bold mb-1">Date</div>
+                                    <div className="text-white">{event.date}</div>
+                                </div>
+                            </div>
+                            {event.details && (<div className="bg-white/5 p-3 rounded-lg"><div className="text-xs text-gray-500 uppercase font-bold mb-1">Details</div><div className="text-sm text-gray-300">{event.details}</div></div>)}
+                            {event.notes && (<div className="bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20"><div className="text-xs text-yellow-500 uppercase font-bold mb-1">Notes</div><div className="text-sm text-yellow-200 italic">{event.notes}</div></div>)}
+                        </div>
+                        <button onClick={onClose} className="mt-6 w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-bold">Close</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const GanttCell = ({ events, status, onEventClick }) => {
+            const lanes = useMemo(() => {
+                const rows = [];
+                const sorted = [...events].sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+                sorted.forEach(ev => {
+                    const startMin = timeToMinutes(ev.start);
+                    let placed = false;
+                    for (let i = 0; i < rows.length; i++) {
+                        const lastEventInRow = rows[i][rows[i].length - 1];
+                        const lastEndMin = timeToMinutes(lastEventInRow.end) || (timeToMinutes(lastEventInRow.start) + 60);
+                        if (startMin >= lastEndMin) { rows[i].push(ev); placed = true; break; }
+                    }
+                    if (!placed) rows.push([ev]);
+                });
+                return rows;
+            }, [events]);
+            const minHeight = 36;
+            const laneHeight = 22;
+            const noteHeight = status ? 14 : 0;
+            const calculatedHeight = Math.max(minHeight, (lanes.length * laneHeight) + noteHeight + 4);
+            return (
+                <div className="relative w-full h-full" style={{ minHeight: `${calculatedHeight}px` }}>
+                    {lanes.map((lane, laneIdx) => lane.map((ev, evIdx) => {
+                        const pos = getPosition(ev.start, ev.end);
+                        
+                        let flightInner = null;
+                        if (ev.type === 'Flying' && ev.etd && ev.eta) {
+                            const startMin = timeToMinutes(ev.start);
+                            const endMin = timeToMinutes(ev.end);
+                            const etdMin = timeToMinutes(ev.etd);
+                            const etaMin = timeToMinutes(ev.eta);
+                            const totalDur = endMin - startMin;
+                            if (totalDur > 0) {
+                                const leftP = Math.max(0, (etdMin - startMin) / totalDur * 100);
+                                const widthP = Math.max(0, (etaMin - etdMin) / totalDur * 100);
+                                flightInner = <div className="flight-actual-bar" style={{ left: `${leftP}%`, width: `${widthP}%` }}></div>;
+                            }
+                        }
+
+                        return (
+                            <div key={`${laneIdx}-${evIdx}`} className={`event-bar event-${ev.type.toLowerCase()}`} style={{ ...pos, top: `${laneIdx * laneHeight + 2}px` }} title={`${ev.start}-${ev.end}: ${ev.fullTitle || ev.title}`} onClick={(e) => { e.stopPropagation(); onEventClick(ev); }}>
+                                {flightInner}
+                                <span className="event-bar-text truncate relative z-10">{ev.title}</span>
+                            </div>
+                        );
+                    }))}
+                    {status && <div className="personnel-note" title={status.status}>{status.status}</div>}
+                </div>
+            );
+        };
+
+        function App() {
+            const [roster, setRoster] = useState({});
+            const [dates, setDates] = useState([]);
+            const [scheduleData, setScheduleData] = useState([]);
+            const [personnelStatuses, setPersonnelStatuses] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [progress, setProgress] = useState('');
+            const [error, setError] = useState(null);
+            const [selectedCategory, setSelectedCategory] = useState('All');
+            const [selectedEvent, setSelectedEvent] = useState(null);
+            const [timelineSelection, setTimelineSelection] = useState(null);
+            const [lastUpdated, setLastUpdated] = useState(null);
+            const dragRef = useRef(null);
+
+            useEffect(() => {
+                const loadData = async () => {
+                    try {
+                        setLoading(true);
+                        setProgress('Initializing specialized team...');
+                        const [rosterRes, listRes] = await Promise.all([
+                            fetch(`${API_URL}?type=roster`),
+                            fetch(`${API_URL}?type=list`)
+                        ]);
+
+                        const rosterJson = await rosterRes.json();
+                        const listJson = await listRes.json();
+
+                        if (rosterJson.error) throw new Error(rosterJson.message);
+                        if (listJson.error) throw new Error(listJson.message);
+
+                        setRoster(rosterJson.roster);
+
+                        // Initialize latest time with roster fetch time if available
+                        let latestFetchTime = null;
+                        if (rosterJson.metadata && rosterJson.metadata["current-as-of"]) {
+                            latestFetchTime = new Date(rosterJson.metadata["current-as-of"]);
+                        }
+
+                        const sheetList = listJson.sheets;
+                        setDates(sheetList.map(s => s.isoDate));
+
+                        setProgress(`Fetching ${sheetList.length} days...`);
+                        
+                        const sheetPromises = sheetList.map(async (sheet) => {
+                            const url = `${API_URL}?type=sheet&name=${encodeURIComponent(sheet.name)}&date=${sheet.isoDate}`;
+                            try {
+                                const res = await fetch(url);
+                                return await res.json();
+                            } catch (e) {
+                                return null;
+                            }
+                        });
+
+                        const sheetsData = await Promise.all(sheetPromises);
+                        setProgress('Parsing raw data...');
+                        
+                        let allEvents = [];
+                        let allStatuses = [];
+
+                        sheetsData.forEach(dayData => {
+                            if (!dayData || !dayData.schedule || !dayData.schedule.data) return;
+                            
+                            // Check current-as-of
+                            if (dayData.metadata && dayData.metadata["current-as-of"]) {
+                                const t = new Date(dayData.metadata["current-as-of"]);
+                                if (!latestFetchTime || t > latestFetchTime) {
+                                    latestFetchTime = t;
+                                }
+                            }
+
+                            const date = dayData.metadata.sourceSheet.date;
+                            const raw = dayData.schedule.data;
+
+                            allEvents.push(...parseSupervision(raw.supervision, date));
+                            allEvents.push(...parseFlying(raw.flying, date));
+                            allEvents.push(...parseGround(raw.ground, date));
+                            allEvents.push(...parseNA(raw.na, date));
+                            allEvents.push(...parseAcademics(raw.academics, rosterJson.roster, date));
+
+                            if (raw.personnelNotes) {
+                                allStatuses.push(...parsePersonnelStatus(raw.personnelNotes, date));
+                            }
+                        });
+
+                        setScheduleData(allEvents);
+                        setPersonnelStatuses(allStatuses);
+                        setLastUpdated(latestFetchTime);
+                        setLoading(false);
+                    } catch (err) {
+                        setError(err.message);
+                        setLoading(false);
+                    }
+                };
+                loadData();
+            }, []);
+
+            const addGlobalListeners = () => {
+                window.addEventListener('pointermove', handleWindowPointerMove);
+                window.addEventListener('pointerup', handleWindowPointerUp);
             };
 
-            // Get event type class
-            const getEventTypeClass = (event) => {
-                const type = (event.type || event.eventType || '').toLowerCase();
-                if (type.includes('fly') || type.includes('flight')) return 'event-flying';
-                if (type.includes('ground')) return 'event-ground';
-                if (type.includes('na') || type.includes('unavail')) return 'event-na';
-                if (type.includes('super') || type.includes('supe')) return 'event-supervision';
-                return 'event-other';
+            const handleHeaderMouseDown = (e, dayIndex) => {
+                if (e.button !== 0) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                const clickTime = getMinutesFromClick(e, rect);
+                if (timelineSelection) { setTimelineSelection(null); return; }
+                dragRef.current = { mode: 'create', dayIndex, originTime: clickTime, lastTime: clickTime };
+                setTimelineSelection({ type: 'marker', dayIndex, start: clickTime, end: clickTime });
+                addGlobalListeners();
             };
 
-            // Format event display
-            const formatEvent = (event) => {
-                const time = event.time || event.startTime || '';
-                const title = event.title || event.event || event.description || '';
-                const shortTime = time.replace(':00', '').replace(' ', '');
-                return `${shortTime} ${title}`;
+            const handleOverlayDragStart = (mode, e) => {
+                if (e.button !== 0) return;
+                dragRef.current = { mode, dayIndex: timelineSelection.dayIndex, initialSelection: { ...timelineSelection } };
+                addGlobalListeners();
             };
 
-            // Render event block
-            const EventBlock = ({ event }) => {
-                const typeClass = getEventTypeClass(event);
-                const display = formatEvent(event);
+            const handleContainerPointerDown = (e) => {
+                if (e.button !== 0) return;
+                if (e.target.classList.contains('gantt-container')) {
+                    if (e.offsetX > e.target.clientWidth || e.offsetY > e.target.clientHeight) return;
+                }
+                const container = e.currentTarget;
+                dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, scrollStartX: container.scrollLeft, scrollStartY: container.scrollTop, isDrag: false };
+                addGlobalListeners();
+            };
+
+            const handleWindowPointerMove = (e) => {
+                if (!dragRef.current) return;
+                if (dragRef.current.mode === 'pan') {
+                    const { startX, startY, scrollStartX, scrollStartY } = dragRef.current;
+                    const deltaX = e.clientX - startX;
+                    const deltaY = e.clientY - startY;
+                    if (!dragRef.current.isDrag && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) dragRef.current.isDrag = true;
+                    const container = document.querySelector('.gantt-container');
+                    if (container) { container.scrollLeft = scrollStartX - deltaX; container.scrollTop = scrollStartY - deltaY; }
+                    return;
+                }
+                const { mode, dayIndex, initialSelection, originTime } = dragRef.current;
+                const dayLeft = 180 + (dayIndex * 300);
+                const container = document.querySelector('.gantt-container');
+                const scrollLeft = container ? container.scrollLeft : 0;
+                const containerRect = container.getBoundingClientRect();
+                const columnVisualLeft = containerRect.left + dayLeft - scrollLeft;
+                const xInColumn = e.clientX - columnVisualLeft;
+                const percent = Math.max(0, Math.min(1, xInColumn / 300));
+                const rangeStart = 6 * 60; const rangeEnd = 18 * 60; const totalMin = rangeEnd - rangeStart;
+                const currentTime = Math.round(rangeStart + (percent * totalMin));
+
+                if (mode === 'create') {
+                    if (Math.abs(currentTime - originTime) > 10) { const s = Math.min(originTime, currentTime); const end = Math.max(originTime, currentTime); setTimelineSelection({ type: 'range', dayIndex, start: s, end: end }); }
+                    else { setTimelineSelection({ type: 'marker', dayIndex, start: currentTime, end: currentTime }); }
+                } else if (mode === 'drag-marker') { setTimelineSelection({ ...initialSelection, start: currentTime, end: currentTime }); }
+                else if (mode === 'drag-start') { const newStart = Math.min(currentTime, initialSelection.end - 15); setTimelineSelection({ ...initialSelection, start: newStart }); }
+                else if (mode === 'drag-end') { const newEnd = Math.max(currentTime, initialSelection.start + 15); setTimelineSelection({ ...initialSelection, end: newEnd }); }
+            };
+
+            const handleWindowPointerUp = (e) => {
+                if (dragRef.current && dragRef.current.mode === 'pan') {
+                    if (!dragRef.current.isDrag) {
+                        if (!e.target.closest('.event-bar')) setTimelineSelection(null);
+                    }
+                }
+                dragRef.current = null;
+                window.removeEventListener('pointermove', handleWindowPointerMove);
+                window.removeEventListener('pointerup', handleWindowPointerUp);
+            };
+
+            const personnelList = useMemo(() => {
+                if (selectedCategory === 'All') return Object.entries(roster).flatMap(([cat, names]) => names.map(name => ({ name, category: cat })));
+                return (roster[selectedCategory] || []).map(name => ({ name, category: selectedCategory }));
+            }, [roster, selectedCategory]);
+
+            // UPDATED DATE FORMATTING (UTC)
+            const formatHeaderDate = (isoDate) => {
+                const [y, m, d] = isoDate.split('-').map(Number);
+                const date = new Date(Date.UTC(y, m - 1, d));
+                
+                const weekday = date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+                const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+                const dayNum = date.getUTCDate();
 
                 return (
-                    <div
-                        className={`event-block ${typeClass}`}
-                        title={`${event.time || ''} - ${event.title || event.event || ''}\n${event.location || ''}`}
-                    >
-                        {display}
+                    <div className="flex flex-col h-full justify-between w-full pointer-events-none">
+                        <div className="flex flex-col items-center">
+                            <span className="font-bold text-white uppercase text-xs">{weekday}</span>
+                            <span className="text-gray-400">{dayNum} {month}</span>
+                        </div>
+                        <div className="header-time-scale">
+                            <span style={{ position: 'absolute', left: '0%' }}>6</span>
+                            <span style={{ position: 'absolute', left: '25%', transform: 'translateX(-50%)' }}>9</span>
+                            <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>12</span>
+                            <span style={{ position: 'absolute', left: '75%', transform: 'translateX(-50%)' }}>15</span>
+                            <span style={{ position: 'absolute', left: '100%', transform: 'translateX(-100%)' }}>18</span>
+                        </div>
                     </div>
                 );
             };
 
-            const filteredPeople = getFilteredPeople();
+            if (error) return <div className="text-red-500 p-8 text-center glass-card m-10">Error: {error}</div>;
 
             return (
-                <div className="max-w-full mx-auto">
-                    {/* Header - needs high z-index because backdrop-filter creates stacking context */}
-                    <div className="glass-card rounded-xl p-4 mb-4 no-print" style={{ overflow: 'visible', position: 'relative', zIndex: 50 }}>
-                        <div className="flex flex-wrap items-center justify-between gap-4" style={{ overflow: 'visible' }}>
-                            <div>
-                                <h1 className="text-xl font-semibold text-white">TPS Class Schedule</h1>
-                                <p className="text-gray-400 text-sm">Weekly Gantt View</p>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-4">
-                                <MultiSelect
-                                    options={categories}
-                                    selected={selectedCategories}
-                                    onChange={setSelectedCategories}
-                                    placeholder="Select categories..."
-                                />
-
-                                <button
-                                    onClick={fetchBulkData}
-                                    disabled={loading}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
-                                >
-                                    {loading ? 'Loading...' : 'Refresh'}
-                                </button>
-
-                                <button
-                                    onClick={() => window.print()}
-                                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors"
-                                >
-                                    Print
-                                </button>
-
-                                <a
-                                    href="index.html"
-                                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-                                >
-                                    Individual View
-                                </a>
-                            </div>
+                <div className="flex flex-col h-full">
+                    <Modal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+                    <div className="glass-header flex justify-between items-center">
+                        <div>
+                            <h1 className="text-xl font-bold text-white tracking-tight">TPS CREW RAINBOW</h1>
+                            <p className="text-xs text-gray-400">
+                                {loading ? progress : `Active: ${scheduleData.length} Events across ${dates.length} Days`}
+                                {lastUpdated && <span className="ml-3 text-gray-500 border-l border-gray-600 pl-3">Updated: {lastUpdated.toLocaleTimeString()} {lastUpdated.toLocaleDateString()}</span>}
+                            </p>
                         </div>
-
-                        {cacheMetadata && (
-                            <div className="mt-2 text-xs text-gray-500">
-                                Cache updated: {new Date(cacheMetadata.lastRun).toLocaleString()}
-                                {allData && ` | ${allData.peopleCount} people loaded`}
-                            </div>
-                        )}
-
-                        {selectedCategories.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {selectedCategories.map(cat => (
-                                    <span key={cat} className="text-xs bg-blue-600/30 px-2 py-1 rounded">
-                                        {cat}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
+                        <div className="flex gap-3"><select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="All">All Personnel</option>{Object.keys(roster).map(cat => (<option key={cat} value={cat}>{cat}</option>))}</select><button onClick={() => window.location.reload()} className="bg-blue-600 px-4 py-1 rounded-lg text-sm font-bold hover:bg-blue-500 transition-colors">Refresh</button></div>
                     </div>
-
-                    {/* Loading state */}
-                    {loading && (
-                        <div className="glass-card rounded-xl p-8 text-center">
-                            <div className="spinner mx-auto mb-4"></div>
-                            <p className="text-gray-400">Loading all schedules...</p>
-                        </div>
-                    )}
-
-                    {/* Error state */}
-                    {error && (
-                        <div className="glass-card rounded-xl p-8 text-center border border-red-500/50">
-                            <p className="text-red-400">Error: {error}</p>
-                        </div>
-                    )}
-
-                    {/* No selection state */}
-                    {!loading && !error && selectedCategories.length === 0 && (
-                        <div className="glass-card rounded-xl p-8 text-center">
-                            <p className="text-gray-400">Select one or more categories to view schedules</p>
-                        </div>
-                    )}
-
-                    {/* No data state */}
-                    {!loading && !error && selectedCategories.length > 0 && filteredPeople.length === 0 && (
-                        <div className="glass-card rounded-xl p-8 text-center">
-                            <p className="text-gray-400">No people found for selected categories</p>
-                        </div>
-                    )}
-
-                    {/* Gantt Chart */}
-                    {!loading && !error && filteredPeople.length > 0 && (
-                        <div className="glass-card rounded-xl overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <div className="gantt-grid" style={{ minWidth: '900px' }}>
-                                    {/* Header row */}
-                                    <div className="gantt-header">Name</div>
-                                    {weekDates.map((day, i) => (
-                                        <div key={i} className="gantt-header">
-                                            {day.display}
+                    {loading ? (<div className="flex flex-col items-center justify-center flex-1"><div className="spinner mb-4 w-10 h-10 border-4"></div><div className="text-blue-400 font-bold tracking-widest uppercase text-xs animate-pulse">{progress}</div></div>) : (
+                        <div className="gantt-container" onPointerDown={handleContainerPointerDown}>
+                            <div className="gantt-grid" style={{ gridTemplateColumns: `180px repeat(${dates.length}, 300px)` }}>
+                                <div className="gantt-header gantt-name-header" onPointerDown={(e) => e.stopPropagation()}>PERSONNEL</div>
+                                {dates.map((date, idx) => {
+                                    return (
+                                        <div key={date} className="gantt-header" onPointerDown={(e) => { e.stopPropagation(); handleHeaderMouseDown(e, idx); }}>
+                                            {formatHeaderDate(date)}
+                                            {timelineSelection && timelineSelection.dayIndex === idx && (<TimelineHeaderHandles selection={timelineSelection} onUpdate={handleOverlayDragStart} />)}
                                         </div>
-                                    ))}
-
-                                    {/* Data rows */}
-                                    {filteredPeople.map((person) => (
-                                        <React.Fragment key={person.name}>
-                                            <div className="gantt-name">
-                                                {person.name}
-                                            </div>
-                                            {weekDates.map((day, colIdx) => {
-                                                const events = getEventsForDate(person, day.dateStr);
-                                                return (
-                                                    <div key={colIdx} className="gantt-cell">
-                                                        {events.map((event, eventIdx) => (
-                                                            <EventBlock key={eventIdx} event={event} />
-                                                        ))}
-                                                    </div>
-                                                );
-                                            })}
-                                        </React.Fragment>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Legend */}
-                    {!loading && filteredPeople.length > 0 && (
-                        <div className="glass-card rounded-xl p-4 mt-4 no-print">
-                            <div className="flex flex-wrap gap-4 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded event-flying"></div>
-                                    <span>Flight</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded event-ground"></div>
-                                    <span>Ground</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded event-na"></div>
-                                    <span>N/A</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded event-supervision"></div>
-                                    <span>Supervision</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 rounded event-other"></div>
-                                    <span>Other</span>
-                                </div>
+                                    );
+                                })}
+                                {personnelList.map((person, idx) => (
+                                    <React.Fragment key={`${person.name}-${idx}`}>
+                                        <div className="gantt-row-name border-b border-gray-800/50"><div><div className="font-bold text-white leading-tight">{person.name}</div><div className="text-[10px] text-gray-500 uppercase tracking-tighter">{person.category}</div></div></div>
+                                        {dates.map(date => {
+                                            const cellEvents = scheduleData.filter(e => e.person === person.name && e.date === date);
+                                            const status = personnelStatuses.find(s => s.person === person.name && s.date === date);
+                                            return (<div key={`${person.name}-${date}`} className="gantt-cell-container border-b border-gray-800/50 border-r border-gray-800/30"><GanttCell events={cellEvents} status={status} onEventClick={(ev) => { setSelectedEvent(ev); }} /></div>);
+                                        })}
+                                    </React.Fragment>
+                                ))}
+                                {timelineSelection && (<TimelineMarkerLine selection={timelineSelection} dayIndex={timelineSelection.dayIndex} />)}
                             </div>
                         </div>
                     )}
